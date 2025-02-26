@@ -47,7 +47,7 @@ class DatabaseSQLite:
         """Возвращает список всех пользователей"""
         with self.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM users")
+            cursor.execute("SELECT * FROM users")
             users = cursor.fetchall()
             result = []
             

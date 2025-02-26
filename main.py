@@ -52,8 +52,11 @@ def register_user(user: UserRegister):
 def login_user(user: UserLogin):
     """Вход пользователя и выдача JWT-токена"""
     stored_user = db.get_user_by_username(user.username)
-    
-    if not stored_user or not bcrypt.verify(user.password, stored_user["password"]):
+
+    if not stored_user:  # Проверяем, что пользователь существует
+        raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
+
+    if not bcrypt.verify(user.password, stored_user["password"]):
         raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
 
     token = create_token(user.username)
@@ -65,7 +68,6 @@ def login_user(user: UserLogin):
 @app.get("/users/")
 def get_users(secret_code: str | None = Header(default=None)):
     print(secret_code)
-
     verify_token(secret_code) 
     """Получает всех пользователей"""
     users = db.get_all_users()
