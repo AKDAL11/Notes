@@ -1,6 +1,8 @@
+from typing import Optional
 from pydantic import BaseModel
 
 # ______ Модели _________
+
 
 class Note(BaseModel):
     title: str
@@ -15,6 +17,6 @@ class UserLogin(BaseModel):
     password: str
 
 class UserFull(BaseModel):
-    id: str
+    id: int
     username: str
-
+    password: Optional[str] = None

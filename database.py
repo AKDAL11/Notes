@@ -24,52 +24,42 @@ class DatabaseSQLite:
                     password TEXT NOT NULL
                 )
             """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS notes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    content TEXT NOT NULL
-                )
-            """)
             conn.commit()
 
-    #______ Функции для пользоваиелей ________
+    #______ Функции для пользователей ________
 
-    def create_user(self, username: str, password: str) -> int:
-        """Добавляет нового пользователя"""
+    def create_user(self, username: str, password: str) -> UserFull:
+        """Добавляет нового пользователя и возвращает объект UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
             cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
             conn.commit()
-            return cursor.lastrowid
+            user_id = cursor.lastrowid
+            return UserFull(id=user_id, username=username)
 
     def get_all_users(self) -> List[UserFull]:
-        """Возвращает список всех пользователей"""
+        """Возвращает список всех пользователей в виде объектов UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, username FROM users")
             users = cursor.fetchall()
-            result = []
-            
-            for row in users:
-                result.append(UserFull(id=row[0], username=row[1]))
-            return result
+            return [UserFull(id=row[0], username=row[1]) for row in users]
 
-    def get_user_by_id(self, user_id: int) -> Optional[dict]:
-        """Возвращает пользователя по ID"""
+    def get_user_by_id(self, user_id: int) -> Optional[UserFull]:
+        """Возвращает пользователя по ID в виде объекта UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
             row = cursor.fetchone()
-            return {"id": row[0], "username": row[1]} if row else None
+            return UserFull(id=row[0], username=row[1]) if row else None
 
-    def get_user_by_username(self, username: str) -> Optional[dict]:
-        """Возвращает пользователя по username"""
+    def get_user_by_username(self, username: str) -> Optional[UserFull]:
+        """Возвращает пользователя по username в виде объекта UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, username, password FROM users WHERE username = ?", (username,))
             row = cursor.fetchone()
-            return {"id": row[0], "username": row[1], "password": row[2]} if row else None
+            return UserFull(id=row[0], username=row[1], password=row[2]) if row else None
 
     def update_user(self, user_id: int, username: str, password: str) -> bool:
         """Обновляет данные пользователя"""
@@ -85,5 +75,4 @@ class DatabaseSQLite:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
-            return cursor.rowcount > 0
-
+            return cursor.rowcount > 0 

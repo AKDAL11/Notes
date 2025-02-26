@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from database import DatabaseSQLite
 from passlib.hash import bcrypt
-from Models import Note, UserLogin, UserRegister
+from Models import Note, UserLogin, UserRegister, UserFull
 import jwt
 import datetime
 
@@ -53,19 +53,20 @@ def login_user(user: UserLogin):
     """Вход пользователя и выдача JWT-токена"""
     stored_user = db.get_user_by_username(user.username)
     
-    if not stored_user or not bcrypt.verify(user.password, stored_user["password"]):
-        raise HTTPException(status_code=400, detail="Неверное имя пользователя или пароль")
+    if not stored_user:
+        raise HTTPException(status_code=400, detail="Неверное имя пользователя")
+    
+    if not bcrypt.verify(user.password, stored_user.password):
+        raise HTTPException(status_code=400, detail="Неверный пароль")
 
     token = create_token(user.username)
     return {"token": token}
-
 
 # ______CRUD для пользователей _________
 
 @app.get("/users/")
 def get_users(secret_code: str | None = Header(default=None)):
     print(secret_code)
-
     verify_token(secret_code) 
     """Получает всех пользователей"""
     users = db.get_all_users()
@@ -73,6 +74,7 @@ def get_users(secret_code: str | None = Header(default=None)):
     for user in users: 
         print(user.id)
     return users
+
 
 @app.get("/users/{user_id}")
 def get_user(user_id: int, secret_code: str | None = Header(default=None)):
@@ -82,7 +84,7 @@ def get_user(user_id: int, secret_code: str | None = Header(default=None)):
     # Проверяем, соответствует ли user_id владельцу токена
     stored_user = db.get_user_by_username(username)
     print(stored_user)
-    if stored_user["id"] != user_id:
+    if stored_user.id != user_id:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     # Получаем пользователя из базы
