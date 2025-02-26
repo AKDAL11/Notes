@@ -1,9 +1,13 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
+from fastapi.responses import JSONResponse
 from database import DatabaseSQLite
 from passlib.hash import bcrypt
 from Models import Note, UserLogin, UserRegister, UserFull
 import jwt
 import datetime
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from middleware import auth_middleware
+
 
 # Секретный ключ для JWT
 SECRET_KEY = "supersecret"
@@ -14,6 +18,15 @@ app = FastAPI()
 # Создаем объект базы данных
 db = DatabaseSQLite()
 
+# Регистрируем middleware
+app.add_middleware(
+    TrustedHostMiddleware, allowed_hosts=["*"]  # Можно добавить свою логику проверки хоста
+)
+
+@app.middleware("http")
+async def add_authentication(request: Request, call_next):
+    # Применяем middleware для аутентификации
+    return await auth_middleware(request, call_next)
 
 
 # _________ Функции _______
@@ -21,8 +34,8 @@ db = DatabaseSQLite()
 def create_token(username: str):
     """Создает JWT-токен"""
     payload = {
-        "sub": username,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)
+        "sub": username,  # Сохраняем имя пользователя в качестве subject
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)  # Устанавливаем срок действия токена (1 день)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
@@ -31,7 +44,7 @@ def verify_token(token: str):
     """Проверяет JWT-токен"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload["sub"]
+        return payload["sub"]  # Возвращаем username из токена
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Токен истек")
     except jwt.InvalidTokenError:
@@ -62,53 +75,59 @@ def login_user(user: UserLogin):
     token = create_token(user.username)
     return {"token": token}
 
+
 # ______CRUD для пользователей _________
 
+# Получение всех пользователей
 @app.get("/users/")
-def get_users(secret_code: str | None = Header(default=None)):
-    print(secret_code)
-    verify_token(secret_code) 
+def get_users(request: Request):
     """Получает всех пользователей"""
+    # Доступ к user_id через request.state.username (установленный через middleware)
+    user = request.state.user
+    print(f"Запрос выполнен пользователем с ID: {user.id}")
+
     users = db.get_all_users()
-    
-    for user in users: 
+    for user in users:
         print(user.id)
     return users
 
-
+# Получение информации о пользователе
 @app.get("/users/{user_id}")
-def get_user(user_id: int, secret_code: str | None = Header(default=None)):
+def get_user(user_id: int, request: Request):
     """Получает информацию только о себе"""
-    username = verify_token(secret_code)  # Проверяем токен и получаем username из него
-
-    # Проверяем, соответствует ли user_id владельцу токена
-    stored_user = db.get_user_by_username(username)
-    print(stored_user)
-    if stored_user.id != user_id:
+    # Доступ к user_id через request.state.user_id
+    if user_id != request.state.user_id:
         raise HTTPException(status_code=403, detail="Доступ запрещен")
 
-    # Получаем пользователя из базы
     user = db.get_user_by_id(user_id)
-    print(user)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
-
+    
     return user
 
+# Обновление данных пользователя
 @app.put("/users/{user_id}")
-def update_user(user_id: int, user: UserRegister):
+def update_user(user_id: int, user: UserRegister, request: Request):
     """Обновляет данные пользователя"""
+    if user_id != request.state.user_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+
     hashed_password = bcrypt.hash(user.password)
     updated = db.update_user(user_id, user.username, hashed_password)
     if not updated:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
     return {"message": "Пользователь обновлен"}
 
-
+# Удаление пользователя
 @app.delete("/users/{user_id}")
-def delete_user(user_id: int):
+def delete_user(user_id: int, request: Request):
     """Удаляет пользователя по ID"""
+    if user_id != request.state.user_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещен")
+
     deleted = db.delete_user(user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
     return {"message": "Пользователь удален"}
