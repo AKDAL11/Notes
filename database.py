@@ -86,3 +86,4 @@ class DatabaseSQLite:
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
             return cursor.rowcount > 0
+

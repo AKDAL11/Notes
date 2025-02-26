@@ -74,7 +74,6 @@ def get_users(secret_code: str | None = Header(default=None)):
         print(user.id)
     return users
 
-
 @app.get("/users/{user_id}")
 def get_user(user_id: int, secret_code: str | None = Header(default=None)):
     """Получает информацию только о себе"""

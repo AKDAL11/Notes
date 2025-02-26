@@ -17,3 +17,4 @@ class UserLogin(BaseModel):
 class UserFull(BaseModel):
     id: str
     username: str
+
