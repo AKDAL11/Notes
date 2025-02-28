@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 import jwt
 from database import DatabaseSQLite
 from fastapi import HTTPException
+from Models import Role
 
 SECRET_KEY = "supersecret"  # Секретный ключ для JWT
 
@@ -45,7 +46,7 @@ async def auth_middleware(request: Request, call_next):
     print(f"Авторизован: {stored_user.username}, ID: {stored_user.id}, Role: {stored_user.role}")
 
     # Проверка, является ли пользователь админом (если необходимо)
-    if request.url.path.startswith("/admin") and stored_user.role != "admin":
+    if request.url.path.startswith("/admin") and stored_user.role != Role.ADMIN:
         return JSONResponse(status_code=403, content={"detail": "Доступ запрещен. Требуется роль администратора."})
 
     return await call_next(request)

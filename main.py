@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header, Request, APIRouter
 from fastapi.responses import JSONResponse
 from database import DatabaseSQLite
 from passlib.hash import bcrypt
-from Models import Note, UserLogin, UserRegister, UserFull
+from Models import Note, UserLogin, UserRegister, Role
 import jwt
 import datetime
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -22,7 +22,7 @@ db = DatabaseSQLite()
 
 # Модель для запроса на обновление роли
 class RoleUpdateRequest(BaseModel):
-    new_role: str  # Роль пользователя (USER или ADMIN)
+    new_role: Role  # Роль пользователя (USER или ADMIN)
 
 # Регистрируем middleware
 app.add_middleware(
@@ -115,8 +115,6 @@ def get_user(user_id: int, request: Request):
 @app.put("/users/{user_id}")
 def update_user(user_id: int, user: UserRegister, request: Request):
     """Обновляет данные пользователя"""
-    if user_id != request.state.user_id:
-        raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     hashed_password = bcrypt.hash(user.password)
     updated = db.update_user(user_id, user.username, hashed_password)
@@ -129,8 +127,6 @@ def update_user(user_id: int, user: UserRegister, request: Request):
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int, request: Request):
     """Удаляет пользователя по ID"""
-    if user_id != request.state.user_id:
-        raise HTTPException(status_code=403, detail="Доступ запрещен")
 
     deleted = db.delete_user(user_id)
     if not deleted:
@@ -139,17 +135,9 @@ def delete_user(user_id: int, request: Request):
     return {"message": "Пользователь удален"}
 
 # Изменение роли
-@app.put("/users/{user_id}/role")
+@app.put("/admin/{user_id}/role")
 def update_user_role(user_id: int, request: Request, role_update: RoleUpdateRequest):
     """Обновляет роль пользователя (только ADMIN может изменять роли)"""
-
-    # Проверяем, что пользователь авторизован
-    if not hasattr(request.state, "user_id") or not hasattr(request.state, "role"):
-        raise HTTPException(status_code=401, detail="Требуется аутентификация")
-
-    # Проверяем, что текущий пользователь - ADMIN
-    if request.state.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Недостаточно прав")
 
     # Проверяем, существует ли пользователь
     target_user = db.get_user_by_id(user_id)
@@ -159,4 +147,4 @@ def update_user_role(user_id: int, request: Request, role_update: RoleUpdateRequ
     # Обновляем роль в базе данных
     db.update_user_role(user_id, role_update.new_role)
 
-    return {"message": f"Роль пользователя {user_id} обновлена до {role_update.new_role}"}
+    return {"message": f"Роль пользователя {user_id} обновлена до {role_update.new_role.value}"}

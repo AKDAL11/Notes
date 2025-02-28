@@ -1,6 +1,6 @@
 import sqlite3
 from typing import List, Optional
-from Models import UserFull
+from Models import UserFull, Role
 
 DB_NAME = "notes.db"
 
@@ -50,9 +50,9 @@ class DatabaseSQLite:
         """Возвращает пользователя по ID в виде объекта UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,))
             row = cursor.fetchone()
-            return UserFull(id=row[0], username=row[1]) if row else None
+            return UserFull(id=row[0], username=row[1], role=row[2]) if row else None
 
     def get_user_by_username(self, username: str) -> Optional[UserFull]:
         """Возвращает пользователя по username в виде объекта UserFull"""
@@ -60,6 +60,7 @@ class DatabaseSQLite:
             cursor = conn.cursor()
             cursor.execute("SELECT id, username, password, role FROM users WHERE username = ?", (username,))
             row = cursor.fetchone()
+
             return UserFull(id=row[0], username=row[1], password=row[2], role=row[3]) if row else None
 
     def update_user(self, user_id: int, username: str, password: str) -> bool:
@@ -78,10 +79,10 @@ class DatabaseSQLite:
             conn.commit()
             return cursor.rowcount > 0 
         
-    def update_user_role(self, user_id: int, new_role: str):
+    def update_user_role(self, user_id: int, new_role: Role):
         """Обновляет роль пользователя в базе данных"""
         with self.connect() as conn:
             cursor = conn.cursor()
             query = "UPDATE users SET role = ? WHERE id = ?"
-            cursor.execute(query, (new_role, user_id))
+            cursor.execute(query, (new_role.value, user_id))
             conn.commit()
