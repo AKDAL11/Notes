@@ -20,3 +20,4 @@ class UserFull(BaseModel):
     id: int
     username: str
     password: Optional[str] = None
+    role: Optional[str] = 'USER'

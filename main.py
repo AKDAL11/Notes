@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, HTTPException, Depends, Header, Request, APIRouter
 from fastapi.responses import JSONResponse
 from database import DatabaseSQLite
 from passlib.hash import bcrypt
@@ -7,6 +7,7 @@ import jwt
 import datetime
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from middleware import auth_middleware
+from pydantic import BaseModel
 
 
 # Секретный ключ для JWT
@@ -17,6 +18,11 @@ app = FastAPI()
 
 # Создаем объект базы данных
 db = DatabaseSQLite()
+
+
+# Модель для запроса на обновление роли
+class RoleUpdateRequest(BaseModel):
+    new_role: str  # Роль пользователя (USER или ADMIN)
 
 # Регистрируем middleware
 app.add_middleware(
@@ -80,16 +86,16 @@ def login_user(user: UserLogin):
 
 # Получение всех пользователей
 @app.get("/users/")
-def get_users(request: Request):
-    """Получает всех пользователей"""
-    # Доступ к user_id через request.state.username (установленный через middleware)
-    user = request.state.user
-    print(f"Запрос выполнен пользователем с ID: {user.id}")
+async def get_users(request: Request):
+
+    if not hasattr(request.state, "user_id") or not hasattr(request.state, "role"):
+        raise HTTPException(status_code=401, detail="Пользователь не аутентифицирован")
+
+    user = request.state.user_id  
 
     users = db.get_all_users()
-    for user in users:
-        print(user.id)
-    return users
+
+    return {"users": users}
 
 # Получение информации о пользователе
 @app.get("/users/{user_id}")
@@ -131,3 +137,26 @@ def delete_user(user_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     return {"message": "Пользователь удален"}
+
+# Изменение роли
+@app.put("/users/{user_id}/role")
+def update_user_role(user_id: int, request: Request, role_update: RoleUpdateRequest):
+    """Обновляет роль пользователя (только ADMIN может изменять роли)"""
+
+    # Проверяем, что пользователь авторизован
+    if not hasattr(request.state, "user_id") or not hasattr(request.state, "role"):
+        raise HTTPException(status_code=401, detail="Требуется аутентификация")
+
+    # Проверяем, что текущий пользователь - ADMIN
+    if request.state.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+
+    # Проверяем, существует ли пользователь
+    target_user = db.get_user_by_id(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    # Обновляем роль в базе данных
+    db.update_user_role(user_id, role_update.new_role)
+
+    return {"message": f"Роль пользователя {user_id} обновлена до {role_update.new_role}"}

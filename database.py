@@ -41,9 +41,10 @@ class DatabaseSQLite:
         """Возвращает список всех пользователей в виде объектов UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM users")
+            cursor.execute("SELECT id, username, role FROM users")
             users = cursor.fetchall()
-            return [UserFull(id=row[0], username=row[1]) for row in users]
+            # Возвращаем пользователей без паролей для безопасности
+            return [UserFull(id=row[0], username=row[1], role=row[2]) for row in users]
 
     def get_user_by_id(self, user_id: int) -> Optional[UserFull]:
         """Возвращает пользователя по ID в виде объекта UserFull"""
@@ -57,9 +58,9 @@ class DatabaseSQLite:
         """Возвращает пользователя по username в виде объекта UserFull"""
         with self.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username, password FROM users WHERE username = ?", (username,))
+            cursor.execute("SELECT id, username, password, role FROM users WHERE username = ?", (username,))
             row = cursor.fetchone()
-            return UserFull(id=row[0], username=row[1], password=row[2]) if row else None
+            return UserFull(id=row[0], username=row[1], password=row[2], role=row[3]) if row else None
 
     def update_user(self, user_id: int, username: str, password: str) -> bool:
         """Обновляет данные пользователя"""
@@ -76,3 +77,11 @@ class DatabaseSQLite:
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
             return cursor.rowcount > 0 
+        
+    def update_user_role(self, user_id: int, new_role: str):
+        """Обновляет роль пользователя в базе данных"""
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            query = "UPDATE users SET role = ? WHERE id = ?"
+            cursor.execute(query, (new_role, user_id))
+            conn.commit()
